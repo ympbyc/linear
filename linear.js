@@ -8,6 +8,7 @@
 var clos = require('js-clos'),
     l    = require('./list.js');
 
+var debug = false;
 with (Object.assign(clos, l)) {
   var Machine = define_class([], (x)=>{
     return slot_exists(x, 'pstack', Cons) || slot_exists(x, 'pstack', null)
@@ -26,9 +27,10 @@ with (Object.assign(clos, l)) {
     return new Word({
       name: name, 
       immediate: immediate, 
-      thread: naked ? thread : (m)=>{console.log("=>"+name); thread(m); m.pc=cdr(m.pc);}
+      thread: naked ? thread : Object.assign((m)=>{thread(m); m.pc=cdr(m.pc);}, {_name: name})
     });
   }
+  define_method(show, [Function], (x)=>{ return "[λ " + (x._name || x.name) + "]"});
 
   function lookup (w, machine) {
     return machine.dict[w] || null;
@@ -36,11 +38,13 @@ with (Object.assign(clos, l)) {
 
   function inner_interpreter (machine) {
     with (machine) {
+      if (debug) console.log(Object.assign({}, machine, {pc: show(pc),
+          pstack: show(pstack), rstack: show(rstack), dict: null}));
       while ( ! (nullp(pc) && nullp(rstack))) {
         var top = car(pc);
         if (typeof top === 'function') {
           top.call(null, machine);
-        } else if (isA(top, Cons)) {
+        } else if (clos.isA(top, Cons)) {
           rstack = cons(cdr(pc), rstack);
           pc = top;
         } else if (nullp(pc)) {
@@ -50,7 +54,8 @@ with (Object.assign(clos, l)) {
           pstack = cons(top, pstack);
           pc = cdr(pc);
         }
-        //console.log(Object.assign({}, machine, {dict: Object.keys(machine.dict)}));
+        if (debug) console.log(Object.assign({}, machine, {pc: show(pc),
+          pstack: show(pstack), rstack: show(rstack), dict: null}));
       }
     }
   }
@@ -61,7 +66,7 @@ with (Object.assign(clos, l)) {
   prims.push(make_word('drop', false, (m)=>m.pstack = cdr(m.pstack)));
   prims.push(make_word('dup',  false, (m)=>m.pstack = cons(car(m.pstack), m.pstack)));
   prims.push(make_word('swap', false, (m)=>
-    m.pstack = cons(cons(car(m.pstack), car(cdr(m.pstack))), cdr(cdr(p.mstack)))));
+    m.pstack = cons(cons(car(m.pstack), car(cdr(m.pstack))), cdr(cdr(m.pstack)))));
   prims.push(make_word('print', false,  (m)=>console.info(">>>"+car(m.pstack))));
   prims.push(make_word('pstack', false, (m)=>console.log(show(m.pstack))));
   prims.push(make_word('rstack', false, (m)=>console.log(show(m.rstack))));
@@ -87,6 +92,7 @@ with (Object.assign(clos, l)) {
   prims.push(make_word('close', false, (m)=>{
     var thread = null;
     var closure = function (m) {
+      //m.rstack = cons(cdr(m.pc), m.rstack);
       m.pc = foldl((prev,curr)=>cons(curr,prev), null, thread);
     };
     closure.close_in = function (x) {
@@ -99,7 +105,8 @@ with (Object.assign(clos, l)) {
     m.closing = false;
   }));
   prims.push(make_word('name', false, (m)=>{
-    m.dict[car(m.pstack)] = make_word(car(m.pstack), false, car(cdr(m.pstack)), true);
+    /*debug info*/ car(cdr(m.pstack))._name = car(m.pstack);
+    m.dict[car(m.pstack)] = make_word(car(m.pstack), false, list(car(cdr(m.pstack))), true);
     m.pstack = cons(car(m.pstack), cdr(cdr(m.pstack)));
   }));
   prims.push(make_word('immediate', false, (m)=>{
@@ -112,12 +119,14 @@ with (Object.assign(clos, l)) {
     prims.forEach((w) => machine.dict[w.name] = w);
     return Object.assign(function (v) {
       //console.log(v);
-      var w = lookup(v, machine);
-      if (w)
-        handle_found(w, machine);
-      else
-        handle_not_found(v, machine);
-      return "ok";
+      try {
+        var w = lookup(v, machine);
+        if (w)
+          handle_found(w, machine);
+        else
+          handle_not_found(v, machine);
+        return "ok";
+      } catch (err) { console.error(err) }
     }, {machine:machine});
   }
 

@@ -34,11 +34,11 @@ with (require('js-clos')) {
   define_method(toarray, [Cons], (xs)=>foldl(((prev,curr)=>{
     prev.push(curr); 
     return prev;
-  }), [], xs))
+  }), [], xs));
 
   var show = define_generic(false, 'show');
   define_method(show, [Cons], 
-                (xs)=> "(" + toarray(xs).join(" ") + ")");
+                (xs)=> "(" + toarray(xs).map(show).join(" ") + ")");
   define_method(show, [null], (x)=>"()");
   define_method(show, [undefined], (x)=>x);
 

@@ -1,6 +1,7 @@
 /* Linear screenless interface *
  * Minori Yamashita 2020       */
 
+
 var utt = new SpeechSynthesisUtterance();
 utt.pitch = 1;
 utt.rate = 1;
@@ -8,6 +9,8 @@ utt.lang = "en-US";
 utt.text = "Linear, screenless programming environment. If you are new, just type help followed by Enter.";
 
 speechSynthesis.speak(utt);
+
+var forth = new_forth()
 
 var src = [];
 var word = "";
@@ -57,6 +60,7 @@ function execute (w) {
     speechSynthesis.speak(utt);
     return false;
   }
+  forth(w);
   return true;
 }
 

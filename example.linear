@@ -1,0 +1,11 @@
+>>>Example Session
+close <r print dup >r >r open "pr" name drop
+close pr "hello" print drop open "x" name drop
+x
+>>>(hello [λ print] [λ drop])
+>>>hello
+>>>hello
+
+close <r enclose window fetch open "fetch" define
+close "https://example.com/example.html" fetch
+print drop open "fetch-news" define
