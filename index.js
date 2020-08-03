@@ -1,26 +1,48 @@
 /* Linear screenless interface *
  * Minori Yamashita 2020       */
 
+var queue = [];
+function speak_queue () {
+  var utt;
+  if (speechSynthesis.speaking)
+    return;
+  else {
+    if (utt = queue.shift())
+      speechSynthesis.speak(utt);
+  }
+}
+setInterval(speak_queue, 100);
 
-var utt = new SpeechSynthesisUtterance();
-utt.pitch = 1;
-utt.rate = 1;
-utt.lang = "en-US";
-utt.text = "Linear, screenless programming environment. If you are new, just type help followed by Enter.";
+var utt_params = {
+  default: {
+    pitch: 1,
+    rate: 1,
+    lang: "en-US"
+  },
+  key: {
+    pitch: 1,
+    rate: 40,
+    lang: "ja-JP"
+  },
+  print: {
+    pitch: 1,
+    rate: 1,
+    lang: "en-US",
+    voice: speechSynthesis.getVoices().find((x)=>x.name==="Karen")
+  }
+};
 
-speechSynthesis.speak(utt);
+function make_utt (text, param_key="default") {
+  var utt = new SpeechSynthesisUtterance();
+  utt.text = text;
+  return Object.assign(utt, utt_params[param_key]);
+}
+
+speechSynthesis.speak(make_utt("Linear, screenless programming environment. If you are new, just type help followed by Enter."));
 
 var forth = new_forth()
 
 var src = [];
-var word = "";
-var wutt = new SpeechSynthesisUtterance();
-wutt.pitch = 0;
-wutt.rate = 1;
-wutt.lang = "en-US";
-var kutt = new SpeechSynthesisUtterance();
-kutt.pitch = 0;
-kutt.rate = 40;
 var w_in = document.getElementById("word-in");
 w_in.focus();
 var last_w_in = "";
@@ -41,7 +63,7 @@ w_in.addEventListener("keyup", (e)=>{
 function word_in () {
   var w = w_in.value.trim();
   if (w.length <= 0) return;
-  speak_word(w);
+  queue.push(make_utt(w)); //speak word
   if (execute(w)) src.push(w);
   show_src();
   w_in.value = "";
@@ -49,15 +71,11 @@ function word_in () {
 
 function execute (w) {
   if (w === "ss") {
-    utt.text = src.join(", ") + ".";
-    speechSynthesis.cancel();
-    speechSynthesis.speak(utt);
+    queue.push(make_utt(src.join(", ") + "."));
     return false;
   }
   if (w === "ssf") {
-    utt.text = src.join(" ") + ".";
-    speechSynthesis.cancel();
-    speechSynthesis.speak(utt);
+    queue.push(make_utt(src.join(" ") + "."));
     return false;
   }
   forth(w);
@@ -69,18 +87,15 @@ function show_src () {
   source.innerHTML = src.join(" ");
 }
 
-function speak_word (word) {
-  wutt.text = word;
-  speechSynthesis.cancel();
-  speechSynthesis.speak(wutt);
-}
-
 function say_key (key) {
-  kutt.text = key;
   speechSynthesis.cancel();
-  speechSynthesis.speak(kutt);
+  speechSynthesis.speak(make_utt(key, "key"));
 }
 
+this.present = function (x) {
+  console.log(x);
+  queue.push(make_utt(x, "print"));
+}
 
 
 

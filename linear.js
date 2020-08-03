@@ -5,11 +5,13 @@
 //todo: drop js-clos ?
 //      research Symbol
 
-var clos = require('js-clos'),
-    l    = require('./list.js');
+if (this.require) {
+  var CLOS = require('js-clos'),
+      List = require('./list.js');
+}
 
 var debug = false;
-with (Object.assign(clos, l)) {
+with (Object.assign(CLOS, List)) {
   var Machine = define_class([], (x)=>{
     return slot_exists(x, 'pstack', Cons) || slot_exists(x, 'pstack', null)
         && slot_exists(x, 'rstack', Cons) || slot_exists(x, 'pstack', null)
@@ -38,13 +40,13 @@ with (Object.assign(clos, l)) {
 
   function inner_interpreter (machine) {
     with (machine) {
-      if (debug) console.log(Object.assign({}, machine, {pc: show(pc),
+      if (debug) present(Object.assign({}, machine, {pc: show(pc),
           pstack: show(pstack), rstack: show(rstack), dict: null}));
       while ( ! (nullp(pc) && nullp(rstack))) {
         var top = car(pc);
         if (typeof top === 'function') {
           top.call(null, machine);
-        } else if (clos.isA(top, Cons)) {
+        } else if (CLOS.isA(top, Cons)) {
           rstack = cons(cdr(pc), rstack);
           pc = top;
         } else if (nullp(pc)) {
@@ -54,7 +56,7 @@ with (Object.assign(clos, l)) {
           pstack = cons(top, pstack);
           pc = cdr(pc);
         }
-        if (debug) console.log(Object.assign({}, machine, {pc: show(pc),
+        if (debug) present(Object.assign({}, machine, {pc: show(pc),
           pstack: show(pstack), rstack: show(rstack), dict: null}));
       }
     }
@@ -66,10 +68,10 @@ with (Object.assign(clos, l)) {
   prims.push(make_word('drop', false, (m)=>m.pstack = cdr(m.pstack)));
   prims.push(make_word('dup',  false, (m)=>m.pstack = cons(car(m.pstack), m.pstack)));
   prims.push(make_word('swap', false, (m)=>
-    m.pstack = cons(cons(car(m.pstack), car(cdr(m.pstack))), cdr(cdr(m.pstack)))));
-  prims.push(make_word('print', false,  (m)=>console.info(">>>"+car(m.pstack))));
-  prims.push(make_word('pstack', false, (m)=>console.log(show(m.pstack))));
-  prims.push(make_word('rstack', false, (m)=>console.log(show(m.rstack))));
+    m.pstack = cons(car(cdr(m.pstack)), cons(car(m.pstack), cdr(cdr(m.pstack))))));
+  prims.push(make_word('print', false,  (m)=>present(car(m.pstack))));
+  prims.push(make_word('pstack', false, (m)=>present(show(m.pstack))));
+  prims.push(make_word('rstack', false, (m)=>present(show(m.rstack))));
   prims.push(make_word('>r', false, (m)=>{
     m.rstack = cons(car(m.pstack), m.rstack);
     m.pstack = cdr(m.pstack);
@@ -112,13 +114,20 @@ with (Object.assign(clos, l)) {
   prims.push(make_word('immediate', false, (m)=>{
     m.dict[car(m.pstack)].immediate = true;
   }));
+  prims.push(make_word('array', false, (m)=>{
+    m.pstack = cons([], m.pstack);
+  }));
+  prims.push(make_word('push', false, (m)=>{
+    car(cdr(m.pstack)).push(car(m.pstack));
+    m.pstack = cdr(m.pstack)
+  }))
 
 
   function new_forth () {
     var machine = new Machine({pstack:null, rstack:null, pc:null, dict:{}, closing:false});
     prims.forEach((w) => machine.dict[w.name] = w);
     return Object.assign(function (v) {
-      //console.log(v);
+      //present(v);
       try {
         var w = lookup(v, machine);
         if (w)
@@ -155,15 +164,24 @@ with (Object.assign(clos, l)) {
       else
         machine.pstack = cons(sym, machine.pstack);
     } else if (symbolp(v)) {
+        var invokep = true;
+        if (this[v]) { v = this[v]; invokep=false; };
         if (machine.closing)
           car(machine.pstack).close_in(v);
         else
           machine.pstack = cons(v, machine.pstack);
-        handle_found(lookup('invoke', machine));
+        if (invokep) handle_found(lookup('invoke', machine), machine);
     } else {
       if (machine.closing)
         car(machine.pstack).close_in(eval(v));
       else machine.pstack = cons(eval(v), machine.pstack);
     }
   }
+
 }
+
+if (typeof module === "undefined" || typeof module.exports === "undefined")
+    this.new_forth = new_forth;
+else
+    module.exports = {new_forth: new_forth};
+

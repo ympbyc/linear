@@ -3,8 +3,14 @@
  *  Author: Minori Yamashita 2020                      */
 
 //usage example: node -e "`cat lisp.js`" -i
+if (this.require)
+  this.CLOS = require('js-clos');
+else {
+  this.List = {};
+  exports = this.List;
+}
 
-with (require('js-clos')) {
+with (this.CLOS) {
   var Cons = define_class([], (x)=> slot_exists(x, 'car') && slot_exists(x, 'cdr'));
   var car  = define_generic(false, 'car');
   var cdr  = define_generic(false, 'cdr');
