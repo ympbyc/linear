@@ -40,7 +40,7 @@ function make_utt (text, param_key="default") {
 
 speechSynthesis.speak(make_utt("Linear, screenless programming environment. If you are new, just type help followed by Enter."));
 
-var forth = new_forth()
+var forth = new_forth();
 
 var src = [];
 var w_in = document.getElementById("word-in");

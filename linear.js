@@ -32,7 +32,7 @@ with (Object.assign(CLOS, List)) {
       thread: naked ? thread : Object.assign((m)=>{thread(m); m.pc=cdr(m.pc);}, {_name: name})
     });
   }
-  define_method(show, [Function], (x)=>{ return "[λ " + (x._name || x.name) + "]"});
+  define_method(show, [Function], (x)=>{ return "[lambda " + (x._name || x.name) + "] "});
 
   function lookup (w, machine) {
     return machine.dict[w] || null;
@@ -45,7 +45,7 @@ with (Object.assign(CLOS, List)) {
       while ( ! (nullp(pc) && nullp(rstack))) {
         var top = car(pc);
         if (typeof top === 'function') {
-          top.call(null, machine);
+          top.call({m: machine}, machine);
         } else if (CLOS.isA(top, Cons)) {
           rstack = cons(cdr(pc), rstack);
           pc = top;
@@ -69,6 +69,11 @@ with (Object.assign(CLOS, List)) {
   prims.push(make_word('dup',  false, (m)=>m.pstack = cons(car(m.pstack), m.pstack)));
   prims.push(make_word('swap', false, (m)=>
     m.pstack = cons(car(cdr(m.pstack)), cons(car(m.pstack), cdr(cdr(m.pstack))))));
+  prims.push(make_word('rotate', false, (m)=>
+    m.pstack = cons(car(cdr(cdr(m.pstack))),
+                    cons(car(m.pstack),
+                         cons(car(cdr(m.pstack)),
+                              cdr(cdr(cdr(m.pstack))))))));
   prims.push(make_word('print', false,  (m)=>present(car(m.pstack))));
   prims.push(make_word('pstack', false, (m)=>present(show(m.pstack))));
   prims.push(make_word('rstack', false, (m)=>present(show(m.rstack))));
@@ -88,15 +93,19 @@ with (Object.assign(CLOS, List)) {
     var method_name = car(m.pstack);
     var obj = car(cdr(m.pstack));
     var args = car(cdr(cdr(m.pstack)));
+    if (! (args instanceof Array)) args = [args]; //allow mono arg
     var rest = cdr(cdr(cdr(m.pstack)));
     m.pstack = cons(obj[method_name].apply(obj, args), rest); 
   }));
   prims.push(make_word('close', false, (m)=>{
     var thread = null;
-    var closure = function (m) {
-      //m.rstack = cons(cdr(m.pc), m.rstack);
-      m.pc = foldl((prev,curr)=>cons(curr,prev), null, thread);
-    };
+    var closure = ((function () {
+      m = this.m;
+      [].slice.call(arguments).forEach((arg)=>{
+        m.pstack = cons(arg, m.pstack);
+      });
+      m.pc = List.reverse(thread);
+    }).bind({m:m}));
     closure.close_in = function (x) {
       thread = cons(x, thread);
     };
@@ -108,7 +117,9 @@ with (Object.assign(CLOS, List)) {
   }));
   prims.push(make_word('name', false, (m)=>{
     /*debug info*/ car(cdr(m.pstack))._name = car(m.pstack);
-    m.dict[car(m.pstack)] = make_word(car(m.pstack), false, list(car(cdr(m.pstack))), true);
+    var closure = car(cdr(m.pstack));
+    var name = car(m.pstack);
+    m.dict[name] = make_word(car(m.pstack), false, list(closure), true);
     m.pstack = cons(car(m.pstack), cdr(cdr(m.pstack)));
   }));
   prims.push(make_word('immediate', false, (m)=>{
@@ -120,14 +131,31 @@ with (Object.assign(CLOS, List)) {
   prims.push(make_word('push', false, (m)=>{
     car(cdr(m.pstack)).push(car(m.pstack));
     m.pstack = cdr(m.pstack)
+  }));
+  prims.push(make_word('pop', false, (m)=>{
+    var x = car(m.pstack).pop();
+    m.pstack = cons(x, m.pstack);
+  }));
+  prims.push(make_word('save', false, (m)=>{
+    localStorage.setItem("linear-history", JSON.stringify(m.history.filter((x)=>x!="playback"&&x!="forget"&&x!="save")));
   }))
+  prims.push(make_word('playback', false, (m)=>{
+    JSON.parse(localStorage.getItem("linear-history")).forEach(
+      forth
+    );
+  }));
+  prims.push(make_word('forget', false, (m)=>{
+    m.history = [];
+    src =[];
+  }));
 
 
   function new_forth () {
-    var machine = new Machine({pstack:null, rstack:null, pc:null, dict:{}, closing:false});
+    var machine = new Machine({pstack:null, rstack:null, pc:null, dict:{}, closing:false, session:{}});
     prims.forEach((w) => machine.dict[w.name] = w);
+    machine.history = [];
     return Object.assign(function (v) {
-      //present(v);
+      machine.history.push(v);
       try {
         var w = lookup(v, machine);
         if (w)
@@ -165,7 +193,7 @@ with (Object.assign(CLOS, List)) {
         machine.pstack = cons(sym, machine.pstack);
     } else if (symbolp(v)) {
         var invokep = true;
-        if (this[v]) { v = this[v]; invokep=false; };
+        if (this[v] && typeof(this[v]) !== "function") { v = this[v]; invokep=false; };
         if (machine.closing)
           car(machine.pstack).close_in(v);
         else

@@ -44,7 +44,9 @@ with (this.CLOS) {
 
   var show = define_generic(false, 'show');
   define_method(show, [Cons], 
-                (xs)=> "(" + toarray(xs).map(show).join(" ") + ")");
+                (xs)=> "( " + toarray(xs).map(show).join(" ") + " )");
+  define_method(show, [Array],
+                (xs)=> "[ " + xs.map(show).join(" ") + " ]");
   define_method(show, [null], (x)=>"()");
   define_method(show, [undefined], (x)=>x);
 
@@ -61,4 +63,5 @@ with (this.CLOS) {
   exports.foldl   = foldl;
   exports.toarray = toarray;
   exports.show    = show;
+  exports.reverse = (xs)=>foldl((prev,curr)=>cons(curr,prev), null, xs);
 }
